@@ -910,10 +910,12 @@
             try {
                 // Créer un payload JSON directement (pour éviter les problèmes de sérialisation)
                 let payloadStr = JSON.stringify({
-                    bookings: bookings || {},
-                    employees: employees || [],
-                    currentDate: currentDate ? currentDate.getTime() : 0,
-                    nextEmployeeId: nextEmployeeId || 3,
+                    data: {
+                        bookings: bookings || {},
+                        employees: employees || [],
+                        currentDate: currentDate ? currentDate.getTime() : 0,
+                        nextEmployeeId: nextEmployeeId || 3
+                    },
                     updated_at: new Date().toISOString()
                 });
                 
@@ -990,6 +992,11 @@
         }
         
         function applyDataChanges(data) {
+            // Si les données sont imbriquées dans un champ "data", extraire
+            if (data.data && typeof data.data === 'object') {
+                data = data.data;
+            }
+            
             if (data.bookings && typeof data.bookings === 'object') {
                 for (const dateKey in data.bookings) {
                     for (const slotLabel in data.bookings[dateKey]) {
