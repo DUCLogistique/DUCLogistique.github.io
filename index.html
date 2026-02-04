@@ -948,14 +948,6 @@
                 } catch (e2) {}
             }
         }
-                }
-            } catch (e) {
-                console.error('Erreur sauvegarde Supabase:', e);
-                localStorage.setItem(STORAGE_KEY, JSON.stringify({
-                    bookings, employees, currentDate: currentDate.getTime(), nextEmployeeId
-                }));
-            }
-        }
         
         async function loadData() {
             if (!supabaseReady) {
