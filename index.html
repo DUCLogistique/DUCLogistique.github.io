@@ -953,14 +953,23 @@
         
         async function loadData() {
             if (!supabaseReady) {
+                console.log('📖 Mode local: chargement depuis localStorage');
                 try {
                     const raw = localStorage.getItem(STORAGE_KEY);
-                    if (!raw) return;
+                    if (!raw) {
+                        console.log('📖 Aucune donnée locale trouvée');
+                        return;
+                    }
                     const data = JSON.parse(raw);
                     applyDataChanges(data);
-                } catch (e) {}
+                    console.log('📖 Données locales chargées');
+                } catch (e) {
+                    console.error('❌ Erreur chargement local:', e);
+                }
                 return;
             }
+            
+            console.log('📖 Chargement depuis Supabase...');
             try {
                 const response = await fetch(`${SUPABASE_URL}/rest/v1/planning?id=eq.1`, {
                     method: 'GET',
@@ -970,24 +979,38 @@
                         'Content-Type': 'application/json'
                     }
                 });
+                
                 if (response.ok) {
                     const data = await response.json();
+                    console.log('📖 Réponse Supabase reçue:', data);
+                    
                     if (data && data.length > 0) {
                         isSyncing = true;
+                        console.log('📖 Application des données...');
                         applyDataChanges(data[0]);
+                        console.log('✅ Données Supabase chargées');
                         isSyncing = false;
+                    } else {
+                        console.warn('📖 Supabase retourne un tableau vide');
                     }
                 } else {
-                    throw new Error('Réponse Supabase invalide');
+                    console.error('❌ Réponse Supabase invalide:', response.status);
+                    throw new Error('Réponse Supabase invalide: ' + response.status);
                 }
             } catch (e) {
-                console.warn('Chargement Supabase échoué, fallback localStorage:', e);
+                console.warn('❌ Chargement Supabase échoué, fallback localStorage:', e);
                 try {
                     const raw = localStorage.getItem(STORAGE_KEY);
-                    if (!raw) return;
+                    if (!raw) {
+                        console.log('📖 Aucune donnée locale de fallback');
+                        return;
+                    }
                     const data = JSON.parse(raw);
                     applyDataChanges(data);
-                } catch (e2) {}
+                    console.log('📖 Données locales (fallback) chargées');
+                } catch (e2) {
+                    console.error('❌ Erreur fallback:', e2);
+                }
             }
         }
         
@@ -1017,7 +1040,13 @@
             if (typeof data.currentDate === 'number') currentDate = new Date(data.currentDate);
         }
         
-        loadData();
+        // Charger les données et initialiser l'interface
+        (async () => {
+            await loadData();
+            initDateSelects();
+            renderEmployeesList();
+            renderWeek();
+        })();
         
         // Synchronisation périodique (polling) toutes les 3 secondes
         setInterval(async () => {
@@ -1523,9 +1552,10 @@
         });
 
         document.getElementById('btn-add-employee').addEventListener('click', addEmployee);
-        initDateSelects();
-        renderEmployeesList();
-        renderWeek();
+        // Les initializations sont maintenant faites dans loadData() avec async/await
+        // initDateSelects();
+        // renderEmployeesList();
+        // renderWeek();
     </script>
 </body>
 </html>
