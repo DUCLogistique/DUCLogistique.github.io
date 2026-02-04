@@ -8,6 +8,9 @@
     <meta http-equiv="Pragma" content="no-cache">
     <meta http-equiv="Expires" content="0">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Firebase SDK -->
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js"></script>
     <style>
         * {
             margin: 0;
@@ -832,40 +835,113 @@
         let currentDate = new Date(2024, 5, 17);
         const MONTHS_FR = ['Janvier','Février','Mars','Avril','Mai','Juin','Juillet','Août','Septembre','Octobre','Novembre','Décembre'];
 
-        const STORAGE_KEY = 'duc-logistique-planning';
-        function saveData() {
-            try {
-                localStorage.setItem(STORAGE_KEY, JSON.stringify({
-                    bookings, employees, currentDate: currentDate.getTime(), nextEmployeeId
-                }));
-            } catch (e) {}
+        // Firebase configuration - REMPLACEZ PAR VOS IDENTIFIANTS FIREBASE
+        const firebaseConfig = {
+            apiKey: "YOUR_API_KEY",
+            authDomain: "YOUR_PROJECT.firebaseapp.com",
+            projectId: "YOUR_PROJECT_ID",
+            storageBucket: "YOUR_PROJECT.appspot.com",
+            messagingSenderId: "YOUR_MESSAGING_SENDER_ID",
+            appId: "YOUR_APP_ID"
+        };
+        
+        let db = null;
+        let firestoreReady = false;
+        let unsubscribe = null;
+        
+        // Initialiser Firebase
+        try {
+            firebase.initializeApp(firebaseConfig);
+            db = firebase.firestore();
+            firestoreReady = true;
+        } catch (e) {
+            console.warn('Firebase non configuré. Utilisation du stockage local.', e);
+            firestoreReady = false;
         }
-        function loadData() {
+
+        const STORAGE_KEY = 'duc-logistique-planning';
+        let isSyncing = false;
+        
+        async function saveData() {
+            if (!firestoreReady || !db) {
+                try {
+                    localStorage.setItem(STORAGE_KEY, JSON.stringify({
+                        bookings, employees, currentDate: currentDate.getTime(), nextEmployeeId
+                    }));
+                } catch (e) {}
+                return;
+            }
+            if (isSyncing) return;
             try {
-                const raw = localStorage.getItem(STORAGE_KEY);
-                if (!raw) return;
-                const data = JSON.parse(raw);
-                if (data.bookings && typeof data.bookings === 'object') {
-                    for (const dateKey in data.bookings) {
-                        for (const slotLabel in data.bookings[dateKey]) {
-                            for (const empId in data.bookings[dateKey][slotLabel]) {
-                                const arr = data.bookings[dateKey][slotLabel][empId];
-                                if (Array.isArray(arr)) {
-                                    data.bookings[dateKey][slotLabel][empId] = arr.map(s => initSlotState(s));
-                                }
+                await db.collection('planning').doc('main').set({
+                    bookings, employees, currentDate: currentDate.getTime(), nextEmployeeId,
+                    lastUpdated: new Date()
+                });
+            } catch (e) {
+                console.error('Erreur sauvegarde Firestore:', e);
+            }
+        }
+        
+        async function loadData() {
+            if (!firestoreReady || !db) {
+                try {
+                    const raw = localStorage.getItem(STORAGE_KEY);
+                    if (!raw) return;
+                    const data = JSON.parse(raw);
+                    applyDataChanges(data);
+                } catch (e) {}
+                return;
+            }
+            try {
+                const doc = await db.collection('planning').doc('main').get();
+                if (doc.exists) {
+                    const data = doc.data();
+                    isSyncing = true;
+                    applyDataChanges(data);
+                    isSyncing = false;
+                }
+            } catch (e) {
+                console.error('Erreur chargement Firestore:', e);
+            }
+        }
+        
+        function applyDataChanges(data) {
+            if (data.bookings && typeof data.bookings === 'object') {
+                for (const dateKey in data.bookings) {
+                    for (const slotLabel in data.bookings[dateKey]) {
+                        for (const empId in data.bookings[dateKey][slotLabel]) {
+                            const arr = data.bookings[dateKey][slotLabel][empId];
+                            if (Array.isArray(arr)) {
+                                data.bookings[dateKey][slotLabel][empId] = arr.map(s => initSlotState(s));
                             }
                         }
                     }
-                    bookings = data.bookings;
                 }
-                if (data.employees && Array.isArray(data.employees) && data.employees.length > 0) {
-                    employees = data.employees;
-                }
-                if (typeof data.nextEmployeeId === 'number') nextEmployeeId = data.nextEmployeeId;
-                if (typeof data.currentDate === 'number') currentDate = new Date(data.currentDate);
-            } catch (e) {}
+                bookings = data.bookings;
+            }
+            if (data.employees && Array.isArray(data.employees) && data.employees.length > 0) {
+                employees = data.employees;
+            }
+            if (typeof data.nextEmployeeId === 'number') nextEmployeeId = data.nextEmployeeId;
+            if (typeof data.currentDate === 'number') currentDate = new Date(data.currentDate);
         }
+        
         loadData();
+        
+        // Écouter les changements en temps réel depuis Firestore
+        if (firestoreReady && db) {
+            unsubscribe = db.collection('planning').doc('main').onSnapshot((doc) => {
+                if (doc.exists) {
+                    const data = doc.data();
+                    isSyncing = true;
+                    applyDataChanges(data);
+                    renderWeek();
+                    isSyncing = false;
+                }
+            }, (error) => {
+                console.warn('Erreur synchronisation temps réel:', error);
+            });
+        }
 
         function initDateSelects() {
             const monthSel = document.getElementById('select-month');
