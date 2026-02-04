@@ -917,7 +917,7 @@
                     updated_at: new Date().toISOString()
                 });
                 
-                console.log('📤 Envoi de la sauvegarde (taille: ' + payloadStr.length + ' bytes)');
+                console.log('📤 Envoi de la sauvegarde (taille: ' + payloadStr.length + ' bytes)...');
                 
                 const response = await fetch(`${SUPABASE_URL}/rest/v1/planning?id=eq.1`, {
                     method: 'PATCH',
