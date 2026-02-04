@@ -646,6 +646,11 @@
         <header>
             <h1><i class="fas fa-calendar-alt"></i> DUC logistique</h1>
             <p class="subtitle">Gestion des rendez-vous de réception et d'expédition</p>
+            <div style="margin-top: 15px; font-size: 0.9rem; opacity: 0.9;">
+                <span id="supabase-status" style="display: inline-flex; align-items: center; gap: 6px;">
+                    <i class="fas fa-circle" style="font-size: 0.6rem; color: #ef4444;"></i> Chargement...
+                </span>
+            </div>
         </header>
         
         <div class="info-grid">
@@ -841,6 +846,7 @@
         
         let supabaseReady = false;
         let lastSyncTime = 0;
+        let supabaseConnected = false;
         const SYNC_INTERVAL = 3000; // Synchroniser toutes les 3 secondes
 
         // Vérifier que Supabase est configuré
@@ -848,6 +854,38 @@
             return SUPABASE_URL !== "YOUR_SUPABASE_URL" && SUPABASE_KEY !== "YOUR_SUPABASE_KEY";
         }
         supabaseReady = checkSupabaseConfig();
+        
+        function updateSupabaseStatus() {
+            const statusEl = document.getElementById('supabase-status');
+            if (!statusEl) return;
+            if (!supabaseReady) {
+                statusEl.innerHTML = '<i class="fas fa-circle" style="font-size: 0.6rem; color: #f59e0b;"></i> Mode local (Supabase non configuré)';
+            } else if (supabaseConnected) {
+                statusEl.innerHTML = '<i class="fas fa-circle" style="font-size: 0.6rem; color: #10b981;"></i> Synchronisé avec Supabase ✓';
+            } else {
+                statusEl.innerHTML = '<i class="fas fa-circle" style="font-size: 0.6rem; color: #ef4444;"></i> Vérification Supabase...';
+            }
+        }
+        
+        // Vérifier la connexion Supabase au démarrage
+        if (supabaseReady) {
+            fetch(`${SUPABASE_URL}/rest/v1/planning?id=eq.1`, {
+                method: 'GET',
+                headers: {
+                    'apikey': SUPABASE_KEY,
+                    'Authorization': `Bearer ${SUPABASE_KEY}`,
+                    'Content-Type': 'application/json'
+                }
+            }).then(() => {
+                supabaseConnected = true;
+                updateSupabaseStatus();
+            }).catch(() => {
+                supabaseConnected = false;
+                updateSupabaseStatus();
+            });
+        } else {
+            updateSupabaseStatus();
+        }
 
         const STORAGE_KEY = 'duc-logistique-planning';
         let isSyncing = false;
