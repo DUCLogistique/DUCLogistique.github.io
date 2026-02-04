@@ -628,6 +628,20 @@
     </script>
 </head>
 <body>
+    <script>
+        (function(){
+            // If URL has no version param, redirect to same URL with a timestamp to avoid CDN HTML cache
+            try{
+                if(window.location.search.indexOf('v=') === -1){
+                    var ts = Date.now();
+                    var base = window.location.origin + window.location.pathname;
+                    var search = window.location.search ? window.location.search + '&v=' + ts : '?v=' + ts;
+                    var hash = window.location.hash || '';
+                    window.location.replace(base + search + hash);
+                }
+            }catch(e){/* ignore */}
+        })();
+    </script>
     <div class="container">
         <header>
             <h1><i class="fas fa-calendar-alt"></i> DUC logistique</h1>
